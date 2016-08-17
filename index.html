@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Alan Pro Golf</title>
+    <script src="phaser.min.js"></script>
+    <script src="src/boot.js"></script>
+		<script src="src/preload.js"></script>
+		<script src="src/gametitle.js"></script>
+		<script src="src/golfgame.js"></script>
+		<script src="src/gameover.js"></script>	
+		<script src="src/charselect.js"></script>	
+    		<style>
+    			body{margin:0}
+    		</style>
+		<script>
+			(function() {
+				// var game = new Phaser.Game(800, 600, Phaser.AUTO, 'gameDiv');
+				// game.state.add("Boot",boot);
+				// game.state.add("Preload",preload);
+				// game.state.add("GameTitle",gameTitle);
+				// game.state.add("CharSelect",charSelect);
+				// game.state.add("GolfGame",golfGame);
+				// game.state.add("GameOver",gameOver);
+
+				// game.state.start("Boot");
+			})();    
+			var game = new Phaser.Game(800, 600, Phaser.AUTO, 'gameDiv');
+				game.state.add("Boot",boot);
+				game.state.add("Preload",preload);
+				game.state.add("GameTitle",gameTitle);
+				game.state.add("CharSelect",charSelect);
+				game.state.add("GolfGame",golfGame);
+				game.state.add("GameOver",gameOver);
+
+				game.state.start("Boot");
+		</script>
+</head>
+<body>
+  <div id="gameDiv"></div>
+</body>
+</html>
