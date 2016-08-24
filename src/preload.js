@@ -8,6 +8,9 @@ preload.prototype = {
 		
 		//music
 		this.game.load.audio("titleMusic", "assets/title.ogg");
+		this.game.load.audio("charSelectMusic", "assets/charSelect.ogg");
+
+
 		this.game.load.image("gametitle","assets/gametitle.png");
 		this.game.load.image("selectBackground", "assets/background.png");
 

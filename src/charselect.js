@@ -15,6 +15,9 @@ charSelect.prototype = {
 
     this.currentChar = 0;
     this.moveTimer = 0;
+    this.game.audio = {};
+	this.game.audio.charSelectMusic = this.game.add.audio("charSelectMusic");
+
     this.charList = [
         {
             "name": "Alan",
@@ -73,8 +76,14 @@ charSelect.prototype = {
             }
         }
         ]
-	},
+	
+    
+
+
+    },
   	create: function(){
+          this.game.audio.charSelectMusic.loop = true;
+          this.game.audio.charSelectMusic.play();
 		
 		var background = this.game.add.sprite(0,0, "selectBackground");
 		var title = this.game.add.text(
@@ -164,6 +173,7 @@ charSelect.prototype = {
 
     },
 	playTheGame: function(){
+        this.game.audio.charSelectMusic.stop();
 		this.game.state.start("GolfGame");
 	}
 }

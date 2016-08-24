@@ -1,4 +1,5 @@
 var golfGame = function(game){
+
 	var score = 0;
 	var par = 0;
 	var hole = 1;
@@ -9,21 +10,34 @@ var golfGame = function(game){
 	var character;
 	var clubNumber;
 	var strokeBox;
-	var direction;
+	
 	var scorebox;
 	var scoreboardFont;
-	var shootingMode;
-	var changeDirectionTime;
+	
 	var swingbar;
-	var swingbarSelector 
+	var swingbarSelector;
+	var swingbarXmin;
+	var swingbarXmax;
+	
+	var direction;
+	var power;
+	var followthroughDirection;
+
+	var shootingMode;
+	var backswingMode;
+	var followthroughMode;
+	var changeDirectionTime;
+
+	var currentAnimationTween;
 }
 golfGame.prototype = {
 	preload: function(){
+		//controls
 		enterKey = this.game.input.keyboard.addKey(Phaser.Keyboard.ENTER);
 		cursor = this.game.input.keyboard.createCursorKeys();
+		
+		//character and clubs
 		character = this.game.character;
-		shootingMode = false;
-		changeDirectionTime = this.game.time.time;
 		this.clubs = 
 		[
             {
@@ -111,17 +125,31 @@ golfGame.prototype = {
 				"loft": 1
 			}
 		];
+		this.clubNumber = 0;
+		this.currentClub = this.clubs[this.clubNumber];
+		
+		//hole information
 		this.par = 4;
 		this.score = 0;
 		this.hole = 1;
 		this.distance = 341;
-		this.clubNumber = 0;
-		this.currentClub = this.clubs[this.clubNumber];
+		
+		//shooting information
 		this.direction = 0;
-		this.directionArrow;
+		this.power = 0;
+		this.followthroughDirection = 0;
+
+		//modes and timing stuff
+		shootingMode = false;
+		backswingMode = false;
+		followthroughMode = false;
+		changeDirectionTime = this.game.time.time;
+		
+		//fonts
 		this.scoreboardFont = { font: "24px monospace", fill: "#ffffff "};
 	},
 	create: function(){
+		/************** Sprites *************/
 		var course = this.game.add.sprite(0,0, "course");
 		var player = this.game.add.sprite(450,200, "player");
 		this.strokeBox = this.game.add.sprite(450,0, "strokeBox");
@@ -130,30 +158,36 @@ golfGame.prototype = {
 		this.golfBall = this.game.add.sprite(100,550, "ball")
 		this.golfBall.anchor.set(0.5,0.5);
 		this.swingbarSelector = this.game.add.sprite(650,550, "swingbarSelector");
+		this.swingbar = this.game.add.group(); // a group of ticks for the fn:selectPower()
 
-
-		this.swingbar = this.game.add.group();
-
+		//initial text for scoreboard
 		this.game.add.text( this.strokeBox.x+40, this.strokeBox.y+20,
 			"Hole #" + this.hole + "\n" 
 			+ "Par " + this.par + "\n"
 			+ this.distance + " yards", 
 			this.scoreboardFont);
 
+		//the rest of the things to display are updated often enough to have their own fns
 		this.drawSwingbar();
 		this.updateScorebox();
 		this.updateClub();
-		
-		// select club (up and down changes club?)
+
+		/************************************/
+
+
+		/***********  Controls  *************/
+
+		// select club (up and down changes club)
         cursor.up.onDown.add(this.changeClub, this);
 		cursor.down.onDown.add(this.changeClub, this);
 
 		// select angle (left and right changes angle)
-		
+		// this is done in fn:update()
 
 		//once it's selected, we go to power
-		// select power
-		enterKey.onDown.add(this.selectPower, this);
+		enterKey.onDown.add(this.handleEnterKey, this);
+
+		/************************************/
 	},
 	drawSwingbar: function(){
 		this.swingbar.removeAll();
@@ -162,40 +196,93 @@ golfGame.prototype = {
 		var sweetspot = Math.floor(1.4 + this.clubs[this.clubNumber].loft*0.077); 
 		var followthrough = 6;
 		var backswing = 30-6-sweetspot;
-
 		var xoriginal = 450;
 		var xLocation = 450;
-		for(var i = 0; i < 30; i++){
-			if(i<dangerzone){
-				this.swingbar.add(this.game.add.sprite( xLocation, 525, "swingbarBad"));
-			}
-			else{
-				if(i < backswing){
-				this.swingbar.add(this.game.add.sprite( xLocation, 525, "swingbarNormal"));		
-				}
-				else{
-					if(i < backswing+sweetspot){
-						this.swingbar.add(this.game.add.sprite(xLocation,525, "swingbarGood"));
-					}
-					else{
-						this.swingbar.add(this.game.add.sprite(xLocation,525, "swingbarNormal"));
-					}
-				}
-			}
+		this.swingbarXmin = xLocation;
+
+		var sweetspotX = xLocation;
+
+		for(var i=0; i<dangerzone; i++){
+			this.swingbar.add(this.game.add.sprite( xLocation, 525, "swingbarBad"));
 			xLocation += 10;
 		}
-		this.swingbarSelector.destroy();
-		this.swingbarSelector = this.game.add.sprite(650,550, "swingbarSelector");
+		for(var i=0; i<backswing; i++){
+			this.swingbar.add(this.game.add.sprite( xLocation, 525, "swingbarNormal"));
+			xLocation += 10;
+		}
+		for(var i=0; i<sweetspot; i++){
+			this.swingbar.add(this.game.add.sprite( xLocation, 525, "swingbarGood"));
+			sweetspotX = xLocation;
+			xLocation += 10;
+		}
+		sweetspotX -= (10 * sweetspot/2);
 
-		
+		for(var i=0; i<followthrough; i++){
+			this.swingbar.add(this.game.add.sprite( xLocation, 525, "swingbarNormal"));
+			xLocation += 10;
+		}
+
+		this.swingbarXmax = xLocation;
+		this.swingbarSelector.destroy();
+		this.swingbarSelector = this.game.add.sprite(sweetspotX,550, "swingbarSelector");
+
+	},
+	handleEnterKey: function(){
+		if(this.shootingMode){
+			if(this.backswingMode){
+				console.log('backswing Enter');
+				this.currentAnimationTween.stop();
+				this.power = this.swingbarSelector.x;
+				this.followthrough();
+				this.backswingMode = false;
+			}
+			else{
+				console.log('followthrough Enter');
+				this.currentAnimationTween.stop();
+				this.followthroughDirection = this.swingbarSelector.x;
+				this.followthroughMode = false;
+				this.shootBall();
+			}
+		}
+		else{
+			this.selectPower();
+		}
 	},
 	selectPower: function(){
-		this.shootingMode = true;
+		this.shootingMode = true;		
+		this.backswing();
+	},
+	backswing: function(){
+		this.backswingMode = true;
+		//press the button for backswing, or take max.
+		this.currentAnimationTween = this.game.add.tween(this.swingbarSelector).to( 
+			{ x:this.swingbarXmin}, 
+			1000, 
+			Phaser.Easing.Linear.None, true);
 
+		//the enterkey listener handles setting the power.
 
-		this.shootBall();
+		//if the animation isn't stopped, power is set to max? or maybe it should ossicalte
+		// backswingAnimation.onComplete.add(function(){
+		// 	this.backswingMode = false;
+		// 	this.followthrough();
+		// },this);
+	},
+	followthrough: function(){
+		this.followthroughMode = true;
+		//press the button again on the followthrough, or take max.
+		this.currentAnimationTween = this.game.add.tween(this.swingbarSelector).to( 
+			{ x:this.swingbarXmax}, 
+			1000, 
+			Phaser.Easing.Linear.None, true);
+
+			//setup oncomplete to handle this
+
 	},
 	shootBall: function(){
+		//takes in the power and direction and shoots the ball.
+		//if the ball doesn't land legally, we reset the ball.
+		//if the ball lands on the green, we go to the green mode.
 		this.directionArrow.destroy();
 		var angle = this.direction;
 
@@ -234,6 +321,13 @@ golfGame.prototype = {
 
 		
 	},
+	resetBall: function(xValue,yValue){
+		this.directionArrow.destroy();
+		this.game.add.tween(this.golfBall).to( { x:xValue, y:yValue }, 0, Phaser.Easing.Linear.None, true);
+		this.directionArrow = this.game.add.sprite(xValue,yValue, "arrow")
+		this.directionArrow.anchor.set(0.5,0.5);		
+		this.direction = 0; 
+	},
 	updateScorebox: function(){
 		if(this.scorebox){
 			this.scorebox.destroy();
@@ -267,6 +361,7 @@ golfGame.prototype = {
 		this.changeDirectionTime = this.game.time.time + 100;
 	},
 	changeClub: function(key){
+		if(this.shootingMode){return;}
 		var amount = 1;
 		if(key.keyCode == 38){
 			amount = -1;
@@ -293,6 +388,6 @@ golfGame.prototype = {
 			if(cursor.right.isDown){
 				this.changeDirection(5);
 			}
-		}		
+		}
 	}
 }
