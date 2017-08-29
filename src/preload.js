@@ -10,7 +10,6 @@ preload.prototype = {
 		this.game.load.audio("titleMusic", "assets/title.ogg");
 		this.game.load.audio("charSelectMusic", "assets/charSelect.ogg");
 
-
 		this.game.load.image("gametitle","assets/gametitle.png");
 		this.game.load.image("selectBackground", "assets/background.png");
 
@@ -30,14 +29,13 @@ preload.prototype = {
 		this.game.load.image("player","assets/playerpic.png");
 		this.game.load.image("course","assets/course.png");
 		this.game.load.image("ball","assets/ball.png");
+		this.game.load.image("ballShadow","assets/ball-shadow.png");
 		this.game.load.image("strokeBox","assets/strokebox.png");
 		this.game.load.image("arrow","assets/arrow.png");
 		this.game.load.image("swingbarNormal","assets/swingbarNormal.png");
 		this.game.load.image("swingbarBad","assets/swingbarBad.png");
 		this.game.load.image("swingbarGood","assets/swingbarGood.png");
-		this.game.load.image("swingbarSelector","assets/swingbarselector.png");
-
-		
+		this.game.load.image("swingbarSelector","assets/swingbarselector.png");		
 
 	},
   	create: function(){

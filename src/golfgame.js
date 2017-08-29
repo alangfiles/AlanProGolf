@@ -18,6 +18,7 @@ var golfGame = function(game){
 	var swingbarSelector;
 	var swingbarXmin;
 	var swingbarXmax;
+	var middleSweetSpot;
 	
 	var direction;
 	var power;
@@ -155,10 +156,12 @@ golfGame.prototype = {
 		this.strokeBox = this.game.add.sprite(450,0, "strokeBox");
 		this.directionArrow = this.game.add.sprite(100,550, "arrow")
 		this.directionArrow.anchor.set(0.5,0.5);
+		this.ballShadow = this.game.add.sprite(100, 550, "ballShadow");
+		this.ballShadow.anchor.set(0.5,0.5);
 		this.golfBall = this.game.add.sprite(100,550, "ball")
 		this.golfBall.anchor.set(0.5,0.5);
 		this.swingbarSelector = this.game.add.sprite(650,550, "swingbarSelector");
-		this.swingbar = this.game.add.group(); // a group of ticks for the fn:selectPower()
+		this.swingbar = this.game.add.group(); // a group of ticks for the fn:startShootingMode()
 
 		//initial text for scoreboard
 		this.game.add.text( this.strokeBox.x+40, this.strokeBox.y+20,
@@ -190,6 +193,9 @@ golfGame.prototype = {
 		/************************************/
 	},
 	drawSwingbar: function(){
+		//this swingbar ends up being pretty important for adding to distance,
+		//figuring out the hook or draw on the ball, etc.
+
 		this.swingbar.removeAll();
 		//out of 30 bars, how many good, etc.
 		var dangerzone = 2;
@@ -216,7 +222,7 @@ golfGame.prototype = {
 			xLocation += 10;
 		}
 		sweetspotX -= (10 * sweetspot/2);
-
+		this.middleSweetSpot = sweetspotX;
 		for(var i=0; i<followthrough; i++){
 			this.swingbar.add(this.game.add.sprite( xLocation, 525, "swingbarNormal"));
 			xLocation += 10;
@@ -230,101 +236,119 @@ golfGame.prototype = {
 	handleEnterKey: function(){
 		if(this.shootingMode){
 			if(this.backswingMode){
-				console.log('backswing Enter');
 				this.currentAnimationTween.stop();
 				this.power = this.swingbarSelector.x;
 				this.followthrough();
 				this.backswingMode = false;
 			}
-			else{
-				console.log('followthrough Enter');
+			else{ //followthrough actions
 				this.currentAnimationTween.stop();
 				this.followthroughDirection = this.swingbarSelector.x;
 				this.followthroughMode = false;
 				this.shootBall();
 			}
 		}
-		else{
-			this.selectPower();
+		else{ //turns on shooting mode
+			this.startShootingMode();
 		}
 	},
-	selectPower: function(){
+	startShootingMode: function(){
 		this.shootingMode = true;		
 		this.backswing();
 	},
 	backswing: function(){
 		this.backswingMode = true;
+		var swingTime = 200 * this.game.character.stats['Driving']; //200ms * driving
 		//press the button for backswing, or take max.
 		this.currentAnimationTween = this.game.add.tween(this.swingbarSelector).to( 
 			{ x:this.swingbarXmin}, 
-			1000, 
+			swingTime,
 			Phaser.Easing.Linear.None, true);
+		
+		//if the currentAnimationTween is stopped (aka, the user presses the enter key), this won't be called
+		this.currentAnimationTween.onComplete.add(function(){this.handleEnterKey()}, this);
 
-		//the enterkey listener handles setting the power.
-
-		//if the animation isn't stopped, power is set to max? or maybe it should ossicalte
-		// backswingAnimation.onComplete.add(function(){
-		// 	this.backswingMode = false;
-		// 	this.followthrough();
-		// },this);
 	},
 	followthrough: function(){
 		this.followthroughMode = true;
+		var swingTime = 200 * this.game.character.stats['Skill']; //200ms * skill
 		//press the button again on the followthrough, or take max.
 		this.currentAnimationTween = this.game.add.tween(this.swingbarSelector).to( 
 			{ x:this.swingbarXmax}, 
-			1000, 
+			swingTime, 
 			Phaser.Easing.Linear.None, true);
 
-			//setup oncomplete to handle this
+		this.currentAnimationTween.onComplete.add(function(){this.handleEnterKey()}, this);
 
 	},
 	shootBall: function(){
-		//takes in the power and direction and shoots the ball.
-		//if the ball doesn't land legally, we reset the ball.
-		//if the ball lands on the green, we go to the green mode.
-		this.directionArrow.destroy();
+		//get all the swing characteristics
 		var angle = this.direction;
-
 		var power = this.clubs[this.clubNumber].distance;
 		var clubBonus = this.clubs[this.clubNumber].bonus;
 		var charPower = power + clubBonus*this.game.character.stats.Driving/5;
-		console.log("Distance: ", charPower);
 		
-		var oldX = this.golfBall.x;
-		var oldY = this.golfBall.y; //in case the ball is OB
+		//how much of the club bonus to add (or subtract)
+		var range = this.middleSweetSpot - this.swingbarXmin; //260
+		var pow = this.power - this.swingbarXmin; //0-300?
+		if(this.power <= 470){
+			//they went into the danger zone, let's randomize the angle a little
+			// var randomAngle = Math.random()*35; //somewhere between 0 and 35 degrees.
+			// var randomSign = Math.random() > 0.5 ? -1 : 1;
+			// angle += randomSign * randomAngle; 
+		}
 
 		var radians = (angle) * (Math.PI/180);
-		var newX = this.golfBall.x + (charPower * Math.sin(radians));
-		var newY = this.golfBall.y - (charPower * Math.cos(radians));
+		var newLocation = [this.golfBall.x + (charPower * Math.sin(radians))
+		                  ,this.golfBall.y - (charPower * Math.cos(radians))];
+
+		var oldLocation = [this.golfBall.x
+						  ,this.golfBall.y]
+
+		var resetBall = false;
+		var resetLocation = oldLocation;
+
+		this.animateBall(newLocation, resetLocation, resetBall);
+	},
+	animateBall: function(newLocation, resetLocation, resetBall){
+		this.directionArrow.destroy();
+
+		var scale = this.clubs[this.clubNumber].loft/12; 
+			scale = scale < 1 ? 1 : scale;
 		
-		//base the time on the distance moved.
-		var moveTime = power * 10; //10ms per yard. 200 yars = 2 seconds
-		var moveBall = this.game.add.tween(this.golfBall).to( { x:newX, y:newY }, moveTime, Phaser.Easing.Linear.None, true);
-				
-		// //ridiculous function, ball goes up then down, then add to the score.
-		var scale = this.clubs[this.clubNumber].loft/12;
-		scale = scale < 1 ? 1 : scale;
+		console.log(scale);
+
+		var power = this.clubs[this.clubNumber].distance;
+		var moveTime = power * 20; //20ms per yard
+
+		var moveBall = this.game.add.tween(this.golfBall).to( { x:newLocation[0], y:newLocation[1] }, moveTime, Phaser.Easing.Linear.None, true);
+		
+		var moveShadow = this.game.add.tween(this.ballShadow).to({x:newLocation[0], y:newLocation[1]}, moveTime, Phaser.Easing.Linear.None, true);
 
 		var ballUpAnimation = this.game.add.tween(this.golfBall.scale).to( { x: scale, y: scale }, 2*moveTime/3, Phaser.Easing.Linear.None, true);
 		ballUpAnimation.onComplete.add(function(){
 			var ballDownAnimation = this.game.add.tween(this.golfBall.scale).to( { x: 1, y: 1 }, moveTime/3, Phaser.Easing.Linear.None, true);
 			ballDownAnimation.onComplete.add(function(){
 				this.score += 1;
-				this.directionArrow = this.game.add.sprite(newX,newY, "arrow")
-				this.directionArrow.anchor.set(0.5,0.5);		
-				this.direction = 0; //maybe autoline up to pin in future
+				if(resetBall){
+					this.score += 1; //penalty stroke
+					this.resetBall(resetLocation);
+				}
+				else{
+					this.directionArrow = this.game.add.sprite(newLocation[0], newLocation[1], "arrow")
+					this.directionArrow.anchor.set(0.5,0.5);
+					this.direction = 0; //maybe autoline up to pin in future
+				}
 				this.updateScorebox();
 				this.shootingMode = false;
 			}, this)
 		}, this);
 
-		
 	},
-	resetBall: function(xValue,yValue){
+	resetBall: function(location){
 		this.directionArrow.destroy();
-		this.game.add.tween(this.golfBall).to( { x:xValue, y:yValue }, 0, Phaser.Easing.Linear.None, true);
-		this.directionArrow = this.game.add.sprite(xValue,yValue, "arrow")
+		this.game.add.tween(this.golfBall).to( { x:location[0], y:location[1] }, 50, Phaser.Easing.Linear.None, true);
+		this.directionArrow = this.game.add.sprite(location[0],location[1], "arrow")
 		this.directionArrow.anchor.set(0.5,0.5);		
 		this.direction = 0; 
 	},
